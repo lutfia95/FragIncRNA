@@ -1,0 +1,257 @@
+
+#include "query_processor.hpp"
+
+#include "logger.hpp"
+
+#include <cstdint>
+#include <filesystem>
+#include <fstream>
+#include <iomanip>
+#include <numeric>
+#include <sstream>
+#include <stdexcept>
+#include <chrono>
+#include <string>
+#include <iostream>
+
+#include <seqan3/io/sequence_file/input.hpp>
+#include <seqan3/search/views/kmer_hash.hpp>
+
+QueryProcessor::QueryProcessor(Config const & cfg,
+                               IBFIndex & index,
+                               std::string const & ref_name)
+    : cfg_{cfg}
+    , index_{index}
+    , ref_name_{ref_name}
+{}
+
+// -------------------------------------------------------------
+// Combined mode: fill one column (ref_idx) of results[q][ref_idx]
+// -------------------------------------------------------------
+void QueryProcessor::run_fill_results_col(std::size_t ref_idx,
+                                          std::vector<std::vector<RefResult>> & results) const
+{
+    using clock = std::chrono::steady_clock;
+
+    Logger::info("QueryProcessor (combined) for reference '" + ref_name_ + "'.");
+
+    auto & ibf = index_.ibf();
+    auto agent = ibf.counting_agent();
+
+    std::size_t total_queries = results.size();
+
+    seqan3::sequence_file_input query_in{cfg_.query_file};
+
+    std::size_t q = 0;
+    double total_ibf_time = 0.0;
+
+    for (auto & record : query_in)
+    {
+        if (q >= total_queries)
+            throw std::runtime_error("More queries in file than allocated rows in results matrix.");
+
+        auto const & seq = record.sequence();
+        std::size_t total_kmers =
+            seq.size() >= cfg_.kmer_size ? seq.size() - cfg_.kmer_size + 1 : 0;
+
+        auto hash_view = seq | seqan3::views::kmer_hash(
+                                    seqan3::ungapped{static_cast<uint8_t>(cfg_.kmer_size)});
+
+        auto start  = clock::now();
+        auto counts = agent.bulk_count(hash_view);
+        auto stop   = clock::now();
+
+        double dt_sec =
+            std::chrono::duration<double>(stop - start).count();
+        total_ibf_time += dt_sec;
+
+        std::uint64_t match_count =
+            std::accumulate(counts.begin(), counts.end(), std::uint64_t{0});
+
+        bool   pass = (match_count >= cfg_.hit_threshold);
+        double pct  = (total_kmers > 0)
+                      ? static_cast<double>(match_count) / total_kmers
+                      : 0.0;
+
+        if (ref_idx >= results[q].size())
+            throw std::runtime_error("ref_idx out of range in results matrix.");
+
+        results[q][ref_idx] = RefResult{match_count, pass, pct};
+
+        // progress
+        std::ostringstream prog;
+        prog << "\r[combined] ref " << (ref_idx + 1)
+             << " '" << ref_name_ << "', query "
+             << (q + 1) << "/" << total_queries
+             << ", time=" << std::fixed << std::setprecision(3)
+             << dt_sec << "s";
+        std::cout << prog.str() << std::flush;
+
+        ++q;
+    }
+
+    if (q != total_queries)
+        throw std::runtime_error("Fewer queries in file than rows in results matrix.");
+
+    std::cout << std::endl;
+    Logger::info("Finished combined processing for '" + ref_name_ +
+                 "', total IBF time: " + std::to_string(total_ibf_time) + " s.");
+}
+
+// -------------------------------------------------------------
+// Per-IBF mode: stream directly to results_<ref>.tsv
+// -------------------------------------------------------------
+void QueryProcessor::run_write_per_ibf(std::filesystem::path const & out_path) const
+{
+    using clock = std::chrono::steady_clock;
+
+    Logger::info("QueryProcessor (per-IBF) for reference '" + ref_name_ + "'.");
+
+    std::ofstream out(out_path);
+    if (!out)
+        throw std::runtime_error("Failed to open per-IBF result file: " + out_path.string());
+
+    auto & ibf = index_.ibf();
+    auto agent = ibf.counting_agent();
+
+    // header
+    out << "query"
+        << '\t' << ref_name_ << "_count"
+        << '\t' << ref_name_ << "_pass"
+        << '\t' << ref_name_ << "_pct"
+        << '\n';
+
+    seqan3::sequence_file_input query_in{cfg_.query_file};
+
+    std::size_t q = 0;
+    double total_ibf_time = 0.0;
+
+    for (auto & record : query_in)
+    {
+        auto const & seq = record.sequence();
+        std::string  qid = record.id();
+
+        std::size_t total_kmers =
+            seq.size() >= cfg_.kmer_size ? seq.size() - cfg_.kmer_size + 1 : 0;
+
+        auto hash_view = seq | seqan3::views::kmer_hash(
+                                    seqan3::ungapped{static_cast<uint8_t>(cfg_.kmer_size)});
+
+        auto start  = clock::now();
+        auto counts = agent.bulk_count(hash_view);
+        auto stop   = clock::now();
+
+        double dt_sec =
+            std::chrono::duration<double>(stop - start).count();
+        total_ibf_time += dt_sec;
+
+        std::uint64_t match_count =
+            std::accumulate(counts.begin(), counts.end(), std::uint64_t{0});
+
+        bool   pass = (match_count >= cfg_.hit_threshold);
+        double pct  = (total_kmers > 0)
+                      ? static_cast<double>(match_count) / total_kmers
+                      : 0.0;
+
+        out << qid << '\t'
+            << match_count << '\t'
+            << (pass ? 1 : 0) << '\t'
+            << std::fixed << std::setprecision(4) << pct
+            << '\n';
+
+        // progress
+        std::ostringstream prog;
+        prog << "\r[per-IBF] ref '" << ref_name_
+             << "', query " << (q + 1) 
+             << ", time=" << std::fixed << std::setprecision(3)
+             << dt_sec << "s";
+        std::cout << prog.str() << std::flush;
+
+        ++q;
+    }
+
+    std::cout << std::endl;
+    Logger::info("Finished per-IBF results for '" + ref_name_ +
+                 "', total IBF time: " + std::to_string(total_ibf_time) + " s.");
+}
+
+/*
+void QueryProcessor::run(std::vector<std::vector<RefResult>> & results)
+{
+    using clock = std::chrono::steady_clock;
+
+    Logger::info("Starting query processing for reference '" + index_.ref_name() + "'.");
+
+    // Open queries
+    seqan3::sequence_file_input query_in{cfg_.query_file};
+
+    auto hash_view = seqan3::views::kmer_hash(
+        seqan3::ungapped{static_cast<uint8_t>(cfg_.kmer_size)});
+
+    auto & ibf = index_.ibf();
+    auto agent = ibf.counting_agent<>();
+
+    std::size_t query_idx = 0;
+    double total_ibf_time = 0.0;
+
+    for (auto & record : query_in)
+    {
+        auto const & seq = record.sequence();
+        std::string qid = record.id();
+
+        std::size_t total_kmers =
+            seq.size() >= cfg_.kmer_size ? seq.size() - cfg_.kmer_size + 1 : 0;
+
+        // Optional: log into file (not stdout)
+        Logger::info("Query '" + qid + "' vs '" + index_.ref_name() + "' (" +
+                     std::to_string(seq.size()) + " bp, " +
+                     std::to_string(total_kmers) + " k-mers).");
+
+        auto start = clock::now();
+        auto counts = agent.bulk_count(seq | hash_view);
+        auto stop = clock::now();
+        std::chrono::duration<double> dt = stop - start;
+        double dt_sec = dt.count();
+        total_ibf_time += dt_sec;
+
+        std::uint64_t match_count =
+            std::accumulate(counts.begin(), counts.end(), std::uint64_t{0});
+
+        bool pass = match_count >= cfg_.hit_threshold;
+        double pct = (total_kmers > 0)
+                         ? static_cast<double>(match_count) /
+                               static_cast<double>(total_kmers)
+                         : 0.0;
+
+        // store into result matrix
+        if (query_idx >= results.size())
+            throw std::runtime_error{"Internal error: query index out of range in results matrix."};
+
+        if (ref_idx_ >= results[query_idx].size())
+            throw std::runtime_error{"Internal error: ref index out of range in results matrix."};
+
+        results[query_idx][ref_idx_] = RefResult{match_count, pass, pct};
+
+        // progress bar on stdout
+        std::ostringstream prog;
+        prog << "\r[ref "
+             << (ref_idx_ + 1) << "/" << total_refs_
+             << " " << index_.ref_name()
+             << "] [query "
+             << (query_idx + 1) << "/" << total_queries_
+             << "] last_ibf=" << std::fixed << std::setprecision(3)
+             << dt_sec << "s";
+        std::cout << prog.str() << std::flush;
+
+        ++query_idx;
+    }
+
+    std::cout << std::endl;
+    std::cout << "Total IBF time for " << index_.ref_name()
+              << ": " << std::fixed << std::setprecision(3)
+              << total_ibf_time << " s" << std::endl;
+
+    Logger::info("Finished query processing for reference '" + index_.ref_name() + "'.");
+}
+
+*/
