@@ -29,4 +29,6 @@ struct Config
 
     // true = one big TSV; false = per-IBF results_<ref>.tsv (no results in RAM)
     bool single_results_writer{true};
+
+    std::size_t threads{0};          // 0 = auto-detect, otherwise worker count
 };

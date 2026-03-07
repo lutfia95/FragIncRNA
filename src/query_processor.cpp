@@ -85,7 +85,7 @@ void QueryProcessor::run_fill_results_col(std::size_t ref_idx,
              << (q + 1) << "/" << total_queries
              << ", time=" << std::fixed << std::setprecision(3)
              << dt_sec << "s";
-        std::cout << prog.str() << std::flush;
+        Logger::print_stdout(prog.str());
 
         ++q;
     }
@@ -93,7 +93,7 @@ void QueryProcessor::run_fill_results_col(std::size_t ref_idx,
     if (q != total_queries)
         throw std::runtime_error("Fewer queries in file than rows in results matrix.");
 
-    std::cout << std::endl;
+    Logger::print_stdout("", true);
     Logger::info("Finished combined processing for '" + ref_name_ +
                  "', total IBF time: " + std::to_string(total_ibf_time) + " s.");
 }
@@ -165,12 +165,12 @@ void QueryProcessor::run_write_per_ibf(std::filesystem::path const & out_path) c
              << "', query " << (q + 1) 
              << ", time=" << std::fixed << std::setprecision(3)
              << dt_sec << "s";
-        std::cout << prog.str() << std::flush;
+        Logger::print_stdout(prog.str());
 
         ++q;
     }
 
-    std::cout << std::endl;
+    Logger::print_stdout("", true);
     Logger::info("Finished per-IBF results for '" + ref_name_ +
                  "', total IBF time: " + std::to_string(total_ibf_time) + " s.");
 }

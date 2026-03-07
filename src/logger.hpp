@@ -11,6 +11,7 @@ public:
     static void info(std::string const & msg);
     static void warn(std::string const & msg);
     static void error(std::string const & msg);
+    static void print_stdout(std::string const & msg, bool newline = false);
 
 private:
     static std::ofstream file_;
