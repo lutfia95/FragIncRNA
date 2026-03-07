@@ -63,3 +63,12 @@ void Logger::error(std::string const & msg)
 {
     log_impl("ERROR", msg, file_, mutex_);
 }
+
+void Logger::print_stdout(std::string const & msg, bool newline)
+{
+    std::lock_guard<std::mutex> lock{mutex_};
+    std::cout << msg;
+    if (newline)
+        std::cout << '\n';
+    std::cout << std::flush;
+}

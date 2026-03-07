@@ -4,12 +4,15 @@
 #include "logger.hpp"
 #include "query_processor.hpp"
 
+#include <deque>
 #include <exception>
 #include <filesystem>
+#include <future>
 #include <iostream>
 #include <limits>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <seqan3/argument_parser/all.hpp>
@@ -82,6 +85,12 @@ int main(int argc, char ** argv)
                   seqan3::option_spec::standard,
                   seqan3::arithmetic_range_validator<std::uint64_t>{0, std::numeric_limits<std::uint64_t>::max()});
 
+        parser.add_option(cfg.threads,
+                  'j', "threads",
+                  "Number of references to process in parallel (default: hardware concurrency).",
+                  seqan3::option_spec::standard,
+                  seqan3::arithmetic_range_validator<std::size_t>{1, std::numeric_limits<std::size_t>::max()});
+
         parser.add_option(cfg.output_dir,
                           'O', "output-dir",
                           "Directory for all outputs (results, logs, IBFs, fragments).");
@@ -136,6 +145,9 @@ int main(int argc, char ** argv)
         if (cfg.fpr <= 0.0 || cfg.fpr >= 1.0)
             throw std::runtime_error("FPR must be in (0,1).");
 
+        if (cfg.threads == 0)
+            cfg.threads = std::max<std::size_t>(1u, std::thread::hardware_concurrency());
+
         // Collect reference files
         std::vector<fs::path> ref_files;
         for (auto const & entry : fs::directory_iterator{cfg.ref_dir})
@@ -153,6 +165,7 @@ int main(int argc, char ** argv)
 
         Logger::info("Found " + std::to_string(ref_files.size()) +
                      " reference files to index.");
+        Logger::info("Using " + std::to_string(cfg.threads) + " worker thread(s).");
 
         // Pre-scan queries to get IDs and count (for combined mode)
         std::vector<std::string> query_ids;
@@ -186,10 +199,7 @@ int main(int argc, char ** argv)
                            std::vector<RefResult>(ref_files.size()));
         }
 
-        Fragmenter fragmenter{cfg};
-
-        // Process each reference one-by-one
-        for (std::size_t r = 0; r < ref_files.size(); ++r)
+        auto process_reference = [&](std::size_t r)
         {
             auto const & ref_path = ref_files[r];
             auto const & ref_id   = ref_ids[r];
@@ -197,6 +207,7 @@ int main(int argc, char ** argv)
             Logger::info("Processing reference: " + ref_path.string() +
                          " (id='" + ref_id + "')");
 
+            Fragmenter fragmenter{cfg};
             auto fragments = fragmenter.fragment_reference(ref_path, ref_id);
 
             IBFIndex ibf_idx{ref_id, fragments, cfg};
@@ -230,6 +241,25 @@ int main(int argc, char ** argv)
                                      " (" + ec.message() + ")");
                 }
             }
+        };
+
+        std::size_t worker_count = std::min<std::size_t>(cfg.threads, ref_files.size());
+        std::deque<std::future<void>> active_workers;
+
+        for (std::size_t r = 0; r < ref_files.size(); ++r)
+        {
+            active_workers.push_back(std::async(std::launch::async, process_reference, r));
+            if (active_workers.size() >= worker_count)
+            {
+                active_workers.front().get();
+                active_workers.pop_front();
+            }
+        }
+
+        while (!active_workers.empty())
+        {
+            active_workers.front().get();
+            active_workers.pop_front();
         }
 
         // Combined mode: write final TSV once from results matrix

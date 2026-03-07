@@ -86,7 +86,7 @@ IBFIndex::IBFIndex(std::string ref_name,
         }
         ++bin_idx;
     }
-    std::cout << "Built IBF for reference '" << ref_name_  << std::endl;
+    Logger::print_stdout("Built IBF for reference '" + ref_name_ + "'", true);
     Logger::info("Built IBF for reference '" + ref_name_ + "' (" +
                  std::to_string(bins) + " bins, " +
                  std::to_string(bin_bits) + " bits per bin, " +
