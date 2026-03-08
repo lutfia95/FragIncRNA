@@ -1,0 +1,17 @@
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/lncrna_mers.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/package.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/package_source.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/edit_cache.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/rebuild_cache.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/list_install_components.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/install.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/install/local.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/CMakeFiles/install/strip.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/package.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/package_source.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/edit_cache.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/rebuild_cache.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/list_install_components.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/install.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/install/local.dir
+/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/CMakeFiles/install/strip.dir

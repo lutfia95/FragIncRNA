@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/cmake_install.cmake",
+		"/Users/ahmadlutfi/Downloads/FragIncRNA/FragIncRNA/build/_deps/seqan3_fetch_content-build/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

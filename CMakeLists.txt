@@ -4,8 +4,10 @@ project(lncrna_mers LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(FetchContent)
+enable_testing()
 
 set(seqan3_git_tag "3.0.3")
 message(STATUS "Fetching SeqAn3 ${seqan3_git_tag}")
@@ -18,21 +20,47 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(seqan3_fetch_content)
 
-add_executable(lncrna_mers
-    src/main.cpp
+add_library(lncrna_mers_lib
     src/logger.cpp
     src/fragmenter.cpp
     src/ibf_index.cpp
     src/query_processor.cpp
 )
 
-target_include_directories(lncrna_mers PRIVATE src)
+target_include_directories(lncrna_mers_lib PUBLIC src)
 
-target_link_libraries(lncrna_mers
+target_link_libraries(lncrna_mers_lib
     PUBLIC
         seqan3::seqan3
 )
 
-if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(lncrna_mers PRIVATE -Wall -Wextra -Wpedantic -O3)
+add_executable(lncrna_mers
+    src/main.cpp
+)
+
+target_link_libraries(lncrna_mers
+    PRIVATE
+        lncrna_mers_lib
+)
+
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU" OR
+    CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    target_compile_options(lncrna_mers_lib PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
+if (CMAKE_BUILD_TYPE STREQUAL "Release")
+    target_compile_options(lncrna_mers_lib PRIVATE -O3)
+endif()
+
+if (BUILD_TESTING)
+    add_executable(lncrna_mers_tests
+        tests/unit/test_main.cpp
+    )
+
+    target_link_libraries(lncrna_mers_tests
+        PRIVATE
+            lncrna_mers_lib
+    )
+
+    add_test(NAME lncrna_mers_tests COMMAND lncrna_mers_tests)
 endif()
