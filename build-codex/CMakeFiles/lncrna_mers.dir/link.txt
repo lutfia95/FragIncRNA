@@ -1,1 +1,0 @@
-/usr/bin/c++ -O3 -DNDEBUG -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/lncrna_mers.dir/src/main.cpp.o -o lncrna_mers  liblncrna_mers_lib.a /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libz.tbd /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/libbz2.tbd

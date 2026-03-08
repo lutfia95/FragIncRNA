@@ -1,2 +1,0 @@
-/usr/bin/ar qc liblncrna_mers_lib.a CMakeFiles/lncrna_mers_lib.dir/src/logger.cpp.o CMakeFiles/lncrna_mers_lib.dir/src/fragmenter.cpp.o CMakeFiles/lncrna_mers_lib.dir/src/ibf_index.cpp.o CMakeFiles/lncrna_mers_lib.dir/src/query_processor.cpp.o
-/usr/bin/ranlib liblncrna_mers_lib.a
