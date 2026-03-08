@@ -9,6 +9,7 @@
 struct RefResult
 {
     std::uint64_t count{};
+    std::uint64_t unique_kmers{};
     bool          pass{};
     double        pct{};
 };

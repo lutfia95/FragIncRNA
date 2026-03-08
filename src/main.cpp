@@ -275,6 +275,7 @@ int main(int argc, char ** argv)
             for (std::size_t r = 0; r < ref_ids.size(); ++r)
             {
                 out << '\t' << ref_ids[r] << "_count"
+                    << '\t' << ref_ids[r] << "_unique_kmers"
                     << '\t' << ref_ids[r] << "_pass"
                     << '\t' << ref_ids[r] << "_pct";
             }
@@ -288,6 +289,7 @@ int main(int argc, char ** argv)
                 {
                     auto const & rr = results[q][r];
                     out << '\t' << rr.count
+                        << '\t' << rr.unique_kmers
                         << '\t' << (rr.pass ? 1 : 0)
                         << '\t' << std::fixed << std::setprecision(4) << rr.pct;
                 }
