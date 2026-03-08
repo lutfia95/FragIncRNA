@@ -27,6 +27,7 @@ Example:
   --ref-dir /path/to/references \
   --query-file /path/to/queries.fa \
   --fragment-size 8000 \
+  --threads 8 \
   --kmer-size 15 \
   --hash-functions 3 \
   --hit-threshold 13 \
@@ -42,6 +43,7 @@ Important options:
 - `--ref-dir`: directory containing `.fa`, `.fna`, `.fasta` and gzipped variants
 - `--query-file`: FASTA file with query sequences
 - `--fragment-size`: fragment length used for reference splitting; must be at least `4`
+- `--threads`, `-j`: number of references to process in parallel; defaults to hardware concurrency
 - `--kmer-size`: k-mer length used for indexing and querying
 - `--hash-functions`: number of IBF hash functions
 - `--fpr`: target false positive rate per bin, default `0.01`
