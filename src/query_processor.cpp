@@ -7,6 +7,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
+#include <unordered_set>
 #include <numeric>
 #include <sstream>
 #include <stdexcept>
@@ -16,6 +17,42 @@
 
 #include <seqan3/io/sequence_file/input.hpp>
 #include <seqan3/search/views/kmer_hash.hpp>
+
+namespace
+{
+
+std::string sequence_kmer_to_string(auto const & seq, std::size_t pos, std::size_t kmer_size)
+{
+    std::string kmer;
+    kmer.reserve(kmer_size);
+
+    for (std::size_t i = 0; i < kmer_size; ++i)
+        kmer.push_back(seqan3::to_char(seq[pos + i]));
+
+    return kmer;
+}
+
+std::vector<std::string> collect_unique_matching_kmers(auto const & seq,
+                                                       auto const & counts,
+                                                       std::size_t kmer_size)
+{
+    std::vector<std::string> unique_kmers;
+    std::unordered_set<std::string> seen;
+
+    for (std::size_t i = 0; i < counts.size(); ++i)
+    {
+        if (counts[i] == 0)
+            continue;
+
+        std::string kmer = sequence_kmer_to_string(seq, i, kmer_size);
+        if (seen.insert(kmer).second)
+            unique_kmers.push_back(std::move(kmer));
+    }
+
+    return unique_kmers;
+}
+
+} // namespace
 
 QueryProcessor::QueryProcessor(Config const & cfg,
                                IBFIndex & index,
@@ -37,6 +74,16 @@ void QueryProcessor::run_fill_results_col(std::size_t ref_idx,
 
     auto & ibf = index_.ibf();
     auto agent = ibf.counting_agent();
+
+    auto unique_dir = cfg_.output_dir / "unique_mers";
+    std::filesystem::create_directories(unique_dir);
+
+    auto unique_path = unique_dir / (ref_name_ + ".tsv");
+    std::ofstream unique_out(unique_path);
+    if (!unique_out)
+        throw std::runtime_error("Failed to open unique k-mer output file: " + unique_path.string());
+
+    unique_out << "lncrna\tunique_kmer\n";
 
     std::size_t total_queries = results.size();
 
@@ -67,6 +114,7 @@ void QueryProcessor::run_fill_results_col(std::size_t ref_idx,
 
         std::uint64_t match_count =
             std::accumulate(counts.begin(), counts.end(), std::uint64_t{0});
+        auto unique_kmers = collect_unique_matching_kmers(seq, counts, cfg_.kmer_size);
 
         bool   pass = (match_count >= cfg_.hit_threshold);
         double pct  = (total_kmers > 0)
@@ -76,7 +124,21 @@ void QueryProcessor::run_fill_results_col(std::size_t ref_idx,
         if (ref_idx >= results[q].size())
             throw std::runtime_error("ref_idx out of range in results matrix.");
 
-        results[q][ref_idx] = RefResult{match_count, pass, pct};
+        results[q][ref_idx] = RefResult{match_count,
+                                        static_cast<std::uint64_t>(unique_kmers.size()),
+                                        pass,
+                                        pct};
+
+        std::string qid = record.id();
+        if (unique_kmers.empty())
+        {
+            unique_out << qid << '\t' << '\n';
+        }
+        else
+        {
+            for (auto const & kmer : unique_kmers)
+                unique_out << qid << '\t' << kmer << '\n';
+        }
 
         // progress
         std::ostringstream prog;
@@ -96,6 +158,7 @@ void QueryProcessor::run_fill_results_col(std::size_t ref_idx,
     Logger::print_stdout("", true);
     Logger::info("Finished combined processing for '" + ref_name_ +
                  "', total IBF time: " + std::to_string(total_ibf_time) + " s.");
+    Logger::info("Unique k-mer results written to: " + unique_path.string());
 }
 
 // -------------------------------------------------------------
@@ -114,12 +177,23 @@ void QueryProcessor::run_write_per_ibf(std::filesystem::path const & out_path) c
     auto & ibf = index_.ibf();
     auto agent = ibf.counting_agent();
 
+    auto unique_dir = cfg_.output_dir / "unique_mers";
+    std::filesystem::create_directories(unique_dir);
+
+    auto unique_path = unique_dir / (ref_name_ + ".tsv");
+    std::ofstream unique_out(unique_path);
+    if (!unique_out)
+        throw std::runtime_error("Failed to open unique k-mer output file: " + unique_path.string());
+
     // header
     out << "query"
         << '\t' << ref_name_ << "_count"
+        << '\t' << ref_name_ << "_unique_kmers"
         << '\t' << ref_name_ << "_pass"
         << '\t' << ref_name_ << "_pct"
         << '\n';
+
+    unique_out << "lncrna\tunique_kmer\n";
 
     seqan3::sequence_file_input query_in{cfg_.query_file};
 
@@ -147,6 +221,7 @@ void QueryProcessor::run_write_per_ibf(std::filesystem::path const & out_path) c
 
         std::uint64_t match_count =
             std::accumulate(counts.begin(), counts.end(), std::uint64_t{0});
+        auto unique_kmers = collect_unique_matching_kmers(seq, counts, cfg_.kmer_size);
 
         bool   pass = (match_count >= cfg_.hit_threshold);
         double pct  = (total_kmers > 0)
@@ -155,9 +230,20 @@ void QueryProcessor::run_write_per_ibf(std::filesystem::path const & out_path) c
 
         out << qid << '\t'
             << match_count << '\t'
+            << unique_kmers.size() << '\t'
             << (pass ? 1 : 0) << '\t'
             << std::fixed << std::setprecision(4) << pct
             << '\n';
+
+        if (unique_kmers.empty())
+        {
+            unique_out << qid << '\t' << '\n';
+        }
+        else
+        {
+            for (auto const & kmer : unique_kmers)
+                unique_out << qid << '\t' << kmer << '\n';
+        }
 
         // progress
         std::ostringstream prog;
@@ -173,6 +259,7 @@ void QueryProcessor::run_write_per_ibf(std::filesystem::path const & out_path) c
     Logger::print_stdout("", true);
     Logger::info("Finished per-IBF results for '" + ref_name_ +
                  "', total IBF time: " + std::to_string(total_ibf_time) + " s.");
+    Logger::info("Unique k-mer results written to: " + unique_path.string());
 }
 
 /*
